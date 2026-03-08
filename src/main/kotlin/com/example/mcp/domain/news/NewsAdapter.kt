@@ -7,14 +7,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component
-import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.reactive.function.client.WebClient
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -103,42 +100,14 @@ class ApiNewsAdapter(
 
     private suspend fun fetchWithIsolation(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
         val host = runCatching { URI.create(source.url).host ?: "unknown" }.getOrDefault("unknown")
-
-        var lastException: Exception? = null
-        for (attempt in 0..properties.maxRetries) {
-            try {
-                val articles = fetchFromSource(source, input)
-                logger.info("news source completed source={} host={} articles={}", source.id, host, articles.size)
-                return articles
-            } catch (ex: Exception) {
-                lastException = ex
-                val transient = isTransientException(ex)
-                logger.warn(
-                    "news source failed source={} host={} attempt={} transient={} error={}",
-                    source.id,
-                    host,
-                    attempt + 1,
-                    transient,
-                    ex.toString()
-                )
-                if (!transient || attempt >= properties.maxRetries) {
-                    break
-                }
-                delay(300L * (attempt + 1))
-            }
+        return runCatching {
+            val articles = fetchFromSource(source, input)
+            logger.info("news source completed source={} host={} articles={}", source.id, host, articles.size)
+            articles
+        }.getOrElse { ex ->
+            logger.warn("news source failed source={} host={} error={}", source.id, host, ex.toString())
+            emptyList()
         }
-
-        logger.warn("news source exhausted source={} host={} returning empty result", source.id, host, lastException)
-        return emptyList()
-    }
-
-    private fun isTransientException(ex: Exception): Boolean {
-        val message = ex.toString().lowercase()
-        return ex is ResourceAccessException ||
-            message.contains("timeout") ||
-            message.contains("prematureclose") ||
-            message.contains("connection reset") ||
-            message.contains("temporarily unavailable")
     }
 
     private suspend fun fetchFromSource(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
