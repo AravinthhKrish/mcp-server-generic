@@ -5,8 +5,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "integrations.news")
 data class NewsProperties(
     val enabled: Boolean = false,
-    val connectTimeoutMs: Long = 5000,
-    val readTimeoutMs: Long = 8000,
+    val connectTimeoutMs: Long = 8000,
+    val readTimeoutMs: Long = 15000,
+    val maxRetries: Int = 2,
+    val allowedHosts: List<String> = emptyList(),
+    val blockedHosts: List<String> = listOf("pinterest.com", "instagram.com", "facebook.com"),
     val sources: List<NewsSourceConfig> = emptyList()
 )
 

@@ -12,11 +12,18 @@ integrations:
     access-token: ""
   news:
     enabled: false
+    connect-timeout-ms: 8000
+    read-timeout-ms: 15000
+    max-retries: 2
+    blocked-hosts:
+      - pinterest.com
+      - instagram.com
+      - facebook.com
     sources:
       - id: pinterest
         url: https://www.pinterest.com/news.rss
         type: RSS
-        enabled: true
+        enabled: false
         auth: NONE
       - id: toi
         url: https://timesofindia.indiatimes.com/rssfeedstopstories.cms

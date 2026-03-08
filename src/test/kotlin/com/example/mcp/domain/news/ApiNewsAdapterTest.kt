@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.web.reactive.function.client.WebClient
 import java.net.InetSocketAddress
 
 class ApiNewsAdapterTest {
@@ -45,7 +46,8 @@ class ApiNewsAdapterTest {
                 )
             )
 
-            val adapter = ApiNewsAdapter(properties, ObjectMapper())
+            val webClient = NewsWebClientConfiguration().newsWebClient(WebClient.builder(), properties)
+            val adapter = ApiNewsAdapter(properties, ObjectMapper(), webClient)
             val results = adapter.searchArticles(NewsSearchArticlesInput(query = "kotlin", limit = 10))
 
             assertEquals(2, results.size)
