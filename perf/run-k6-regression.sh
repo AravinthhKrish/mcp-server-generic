@@ -19,15 +19,9 @@ mkdir -p "$RESULT_DIR"
     exit 127
   fi
 
-  echo "$ k6 run perf/mcp-regression.k6.js --summary-export $SUMMARY_FILE"
-  BASE_URL="$BASE_URL" k6 run perf/mcp-regression.k6.js --summary-export "$SUMMARY_FILE"
+  echo "$ BASE_URL=$BASE_URL SUMMARY_FILE=$SUMMARY_FILE HTML_REPORT_FILE=$HTML_REPORT_FILE k6 run perf/mcp-regression.k6.js"
+  BASE_URL="$BASE_URL" SUMMARY_FILE="$SUMMARY_FILE" HTML_REPORT_FILE="$HTML_REPORT_FILE" k6 run perf/mcp-regression.k6.js
 
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required to generate HTML report"
-    exit 127
-  fi
-
-  echo "$ python3 perf/generate-k6-html-report.py --input $SUMMARY_FILE --output $HTML_REPORT_FILE"
-  python3 perf/generate-k6-html-report.py --input "$SUMMARY_FILE" --output "$HTML_REPORT_FILE"
+  echo "JSON summary generated at: $SUMMARY_FILE"
   echo "HTML report generated at: $HTML_REPORT_FILE"
 } | tee "$LOG_FILE"
