@@ -30,6 +30,14 @@ class InMemoryCacheService : CacheService {
     }
 
     override fun put(key: String, value: Any, ttl: Duration) {
-        entries[key] = CacheEntry(value = value, expiresAt = Instant.now().plus(ttl))
+        val now = Instant.now()
+        entries[key] = CacheEntry(value = value, expiresAt = now.plus(ttl))
+        evictExpired(now)
     }
+
+    private fun evictExpired(now: Instant) {
+        entries.entries.removeIf { (_, entry) -> now.isAfter(entry.expiresAt) }
+    }
+
+    internal fun size(): Int = entries.size
 }
