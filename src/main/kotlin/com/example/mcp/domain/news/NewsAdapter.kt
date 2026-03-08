@@ -4,10 +4,14 @@ import com.example.mcp.domain.Article
 import com.example.mcp.mcp.NewsSearchArticlesInput
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.reactor.awaitSingleOrNull
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -65,8 +69,17 @@ class ApiNewsAdapter(
             .filter(::isAllowedSource)
             .toList()
 
+        val concurrencyLimit = properties.maxConcurrentSources.coerceAtLeast(1)
+        val semaphore = Semaphore(concurrencyLimit)
+
         val aggregated = selectedSources
-            .map { source -> async { fetchWithIsolation(source, input) } }
+            .map { source ->
+                async {
+                    semaphore.withPermit {
+                        fetchWithIsolation(source, input)
+                    }
+                }
+            }
             .awaitAll()
             .flatten()
 
@@ -119,9 +132,11 @@ class ApiNewsAdapter(
             .awaitSingleOrNull()
             ?: return emptyList()
 
-        return when (source.type) {
-            SourceType.RSS, SourceType.ATOM -> parseXmlFeed(responseBody, source.id)
-            SourceType.JSON -> parseJsonFeed(responseBody, source.id)
+        return withContext(Dispatchers.IO) {
+            when (source.type) {
+                SourceType.RSS, SourceType.ATOM -> parseXmlFeed(responseBody, source.id)
+                SourceType.JSON -> parseJsonFeed(responseBody, source.id)
+            }
         }
     }
 

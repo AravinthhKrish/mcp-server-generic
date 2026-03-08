@@ -8,6 +8,7 @@ data class NewsProperties(
     val connectTimeoutMs: Long = 8000,
     val readTimeoutMs: Long = 15000,
     val maxRetries: Int = 2,
+    val maxConcurrentSources: Int = 4,
     val allowedHosts: List<String> = emptyList(),
     val blockedHosts: List<String> = listOf("pinterest.com", "instagram.com", "facebook.com"),
     val sources: List<NewsSourceConfig> = emptyList()

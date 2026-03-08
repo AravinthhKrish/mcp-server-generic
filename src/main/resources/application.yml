@@ -15,6 +15,7 @@ integrations:
     connect-timeout-ms: 8000
     read-timeout-ms: 15000
     max-retries: 2
+    max-concurrent-sources: 4
     blocked-hosts:
       - pinterest.com
       - instagram.com
