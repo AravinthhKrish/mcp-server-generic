@@ -86,7 +86,12 @@ k6 run perf/mcp-regression.k6.js
 
 # optional overrides
 BASE_URL=http://localhost:8080 VUS=2 ITERATIONS=5 k6 run perf/mcp-regression.k6.js
+
+# helper wrapper (writes logs to perf/results/)
+./perf/run-k6-regression.sh
 ```
+
+Latest run output is captured in `perf/results/k6-regression-run.log` and k6 summary export (when k6 is available) is written to `perf/results/mcp-regression-summary.json`.
 
 The script validates:
 - Tool endpoints: `drive.search_files`, `gmail.search_messages`, `news.search_articles`, `market.quote`
