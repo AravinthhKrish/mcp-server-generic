@@ -4,10 +4,15 @@ import com.example.mcp.domain.Article
 import com.example.mcp.mcp.NewsSearchArticlesInput
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpHeaders
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.reactive.function.client.WebClient
@@ -24,13 +29,13 @@ import java.time.format.DateTimeFormatter
 import javax.xml.parsers.DocumentBuilderFactory
 
 interface NewsAdapter {
-    fun searchArticles(input: NewsSearchArticlesInput): List<Article>
+    suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article>
 }
 
 @Component
 @ConditionalOnProperty(prefix = "integrations.news", name = ["enabled"], havingValue = "false", matchIfMissing = true)
 class StubNewsAdapter : NewsAdapter {
-    override fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
+    override suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
         return listOf(
             Article(
                 id = "art_001",
@@ -55,7 +60,7 @@ class ApiNewsAdapter(
 ) : NewsAdapter {
     private val logger = LoggerFactory.getLogger(ApiNewsAdapter::class.java)
 
-    override fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
+    override suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article> = coroutineScope {
         val selectedSources = properties.sources
             .asSequence()
             .filter { it.enabled }
@@ -63,11 +68,12 @@ class ApiNewsAdapter(
             .filter(::isAllowedSource)
             .toList()
 
-        val aggregated = selectedSources.flatMap { source ->
-            fetchWithIsolation(source, input)
-        }
+        val aggregated = selectedSources
+            .map { source -> async { fetchWithIsolation(source, input) } }
+            .awaitAll()
+            .flatten()
 
-        return aggregated
+        aggregated
             .filter { matchesQuery(it, input.query) }
             .filter { input.from == null || !it.publishedAt.isBefore(input.from) }
             .filter { input.to == null || !it.publishedAt.isAfter(input.to) }
@@ -95,11 +101,11 @@ class ApiNewsAdapter(
         return true
     }
 
-    private fun fetchWithIsolation(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
+    private suspend fun fetchWithIsolation(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
         val host = runCatching { URI.create(source.url).host ?: "unknown" }.getOrDefault("unknown")
 
         var lastException: Exception? = null
-        repeat(properties.maxRetries + 1) { attempt ->
+        for (attempt in 0..properties.maxRetries) {
             try {
                 val articles = fetchFromSource(source, input)
                 logger.info("news source completed source={} host={} articles={}", source.id, host, articles.size)
@@ -118,7 +124,7 @@ class ApiNewsAdapter(
                 if (!transient || attempt >= properties.maxRetries) {
                     break
                 }
-                Thread.sleep(300L * (attempt + 1))
+                delay(300L * (attempt + 1))
             }
         }
 
@@ -135,13 +141,13 @@ class ApiNewsAdapter(
             message.contains("temporarily unavailable")
     }
 
-    private fun fetchFromSource(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
+    private suspend fun fetchFromSource(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
         val responseBody = newsWebClient.get()
             .uri(buildUri(source, input.query))
             .headers { headers -> addAuthHeaders(headers, source) }
             .retrieve()
             .bodyToMono(String::class.java)
-            .block()
+            .awaitSingleOrNull()
             ?: return emptyList()
 
         return when (source.type) {
@@ -166,6 +172,7 @@ class ApiNewsAdapter(
                     headers.setBearerAuth(source.authToken)
                 }
             }
+
             SourceAuth.HEADER -> {
                 if (source.authToken.isNotBlank()) {
                     headers.set(source.authHeader, source.authToken)
