@@ -19,6 +19,9 @@
 *.tar.gz
 *.rar
 
+**/results/*.html
+**/results/*.json
+**/results/*.log
 .idea/
 .gradle/
 build/
