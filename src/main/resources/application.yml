@@ -3,3 +3,38 @@ spring:
     name: mcp-server-generic
 server:
   port: 8080
+
+integrations:
+  gmail:
+    enabled: false
+    base-url: https://gmail.googleapis.com/gmail/v1
+    user-id: me
+    access-token: ""
+  news:
+    enabled: false
+    sources:
+      - id: pinterest
+        url: https://www.pinterest.com/news.rss
+        type: RSS
+        enabled: true
+        auth: NONE
+      - id: toi
+        url: https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+        type: RSS
+        enabled: true
+        auth: NONE
+      - id: github
+        url: https://api.github.com/repos/spring-projects/spring-boot/issues
+        type: JSON
+        enabled: false
+        auth: HEADER
+        auth-header: Authorization
+        auth-token: ""
+        query-param: q
+      - id: world-times
+        url: https://example.com/world-times-feed
+        type: ATOM
+        enabled: false
+        auth: BEARER
+        auth-token: ""
+        query-param: q
