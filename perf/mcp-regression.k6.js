@@ -78,12 +78,19 @@ function checkRows(checks) {
     .join('');
 }
 
+function collectChecks(group) {
+  if (!group) return [];
+  const ownChecks = group.checks || [];
+  const childChecks = (group.groups || []).flatMap((child) => collectChecks(child));
+  return [...ownChecks, ...childChecks];
+}
+
 function buildHtmlReport(data) {
-  const checks = (data.root_group && data.root_group.checks) || [];
+  const checks = collectChecks(data.root_group);
   const metrics = data.metrics || {};
 
-  const passed = checks.filter((c) => (c.fails || 0) === 0).length;
-  const failed = checks.filter((c) => (c.fails || 0) > 0).length;
+  const passed = checks.reduce((sum, item) => sum + (item.passes || 0), 0);
+  const failed = checks.reduce((sum, item) => sum + (item.fails || 0), 0);
   const checksTable = checks.length
     ? checkRows(checks)
     : '<tr><td colspan="4" class="muted">No checks found.</td></tr>';
