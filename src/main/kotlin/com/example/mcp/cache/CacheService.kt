@@ -3,6 +3,7 @@ package com.example.mcp.cache
 import org.springframework.stereotype.Component
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 interface CacheService {
     fun <T> get(key: String): T?
@@ -11,19 +12,24 @@ interface CacheService {
 
 @Component
 class InMemoryCacheService : CacheService {
-    private val entries = mutableMapOf<String, Pair<Any, Instant>>()
+    private data class CacheEntry(
+        val value: Any,
+        val expiresAt: Instant
+    )
+
+    private val entries = ConcurrentHashMap<String, CacheEntry>()
 
     @Suppress("UNCHECKED_CAST")
     override fun <T> get(key: String): T? {
-        val (value, expiresAt) = entries[key] ?: return null
-        if (Instant.now().isAfter(expiresAt)) {
-            entries.remove(key)
+        val entry = entries[key] ?: return null
+        if (Instant.now().isAfter(entry.expiresAt)) {
+            entries.remove(key, entry)
             return null
         }
-        return value as T
+        return entry.value as T
     }
 
     override fun put(key: String, value: Any, ttl: Duration) {
-        entries[key] = value to Instant.now().plus(ttl)
+        entries[key] = CacheEntry(value = value, expiresAt = Instant.now().plus(ttl))
     }
 }
