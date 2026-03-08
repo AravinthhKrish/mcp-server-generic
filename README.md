@@ -91,7 +91,9 @@ BASE_URL=http://localhost:8080 VUS=2 ITERATIONS=5 k6 run perf/mcp-regression.k6.
 ./perf/run-k6-regression.sh
 ```
 
-Latest run output is captured in `perf/results/k6-regression-run.log` and k6 summary export (when k6 is available) is written to `perf/results/mcp-regression-summary.json`.
+Latest run output is captured in `perf/results/k6-regression-run.log`, k6 summary export is written to `perf/results/mcp-regression-summary.json`, and a readable dynamic HTML report is generated at `perf/results/mcp-regression-report.html`.
+
+Report generation is handled by `perf/generate-k6-html-report.py` (invoked by `perf/run-k6-regression.sh`).
 
 The script validates:
 - Tool endpoints: `drive.search_files`, `gmail.search_messages`, `news.search_articles`, `market.quote`
