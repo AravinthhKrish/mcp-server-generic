@@ -74,9 +74,14 @@ class ApiNewsAdapter(
 
         val aggregated = selectedSources
             .map { source ->
-                async {
+                async(Dispatchers.IO) {
                     semaphore.withPermit {
                         fetchWithIsolation(source, input)
+                        .filter { matchesQuery(it, input.query) }
+                        .filter { input.from == null || !it.publishedAt.isBefore(input.from) }
+                        .filter { input.to == null || !it.publishedAt.isAfter(input.to) }
+                        .sortedByDescending(Article::publishedAt)
+                        .take(5)
                     }
                 }
             }
@@ -84,9 +89,6 @@ class ApiNewsAdapter(
             .flatten()
 
         aggregated
-            .filter { matchesQuery(it, input.query) }
-            .filter { input.from == null || !it.publishedAt.isBefore(input.from) }
-            .filter { input.to == null || !it.publishedAt.isAfter(input.to) }
             .sortedByDescending(Article::publishedAt)
             .take(input.limit)
     }
