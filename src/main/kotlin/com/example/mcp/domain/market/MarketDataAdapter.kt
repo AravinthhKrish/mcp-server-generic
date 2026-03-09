@@ -153,16 +153,16 @@ class KiteMcpMarketDataAdapter(
     }
 
     private fun parseQuote(body: String, input: MarketQuoteInput): Quote {
-        val root = objectMapper.readTree(body)
+        val root = unwrapTextNode(objectMapper.readTree(body))
 
         val quoteNode = when {
-            root.has("quote") -> root.path("quote")
+            root.has("quote") -> unwrapTextNode(root.path("quote"))
             root.has("result") && root.path("result").isTextual -> {
-                runCatching { objectMapper.readTree(root.path("result").asText()) }.getOrNull()?.path("quote")
-                    ?: root.path("result")
+                val parsedResult = unwrapTextNode(root.path("result"))
+                if (parsedResult.has("quote")) parsedResult.path("quote") else parsedResult
             }
             root.has("result") && root.path("result").isObject -> {
-                val result = root.path("result")
+                val result = unwrapTextNode(root.path("result"))
                 if (result.has("quote")) result.path("quote") else result
             }
             else -> root
@@ -180,6 +180,18 @@ class KiteMcpMarketDataAdapter(
             timestamp = quoteNode.path("timestamp").asInstantOrNow(),
             provider = quoteNode.path("provider").asText("kite-mcp")
         )
+    }
+
+
+    private fun unwrapTextNode(node: JsonNode): JsonNode {
+        var current = node
+        var depth = 0
+        while (current.isTextual && depth < 3) {
+            val parsed = runCatching { objectMapper.readTree(current.asText()) }.getOrNull() ?: break
+            current = parsed
+            depth++
+        }
+        return current
     }
 
     private fun JsonNode.asDoubleOrNull(): Double? {
