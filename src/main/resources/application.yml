@@ -74,3 +74,9 @@ integrations:
         auth: BEARER
         auth-token: ""
         query-param: q
+
+
+mcp:
+  api:
+    auth:
+      token: dev-token

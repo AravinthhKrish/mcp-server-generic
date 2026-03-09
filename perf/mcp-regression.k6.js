@@ -12,16 +12,24 @@ export const options = {
 };
 
 const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
+const apiToken = __ENV.MCP_API_TOKEN || 'dev-token';
 const summaryFile = __ENV.SUMMARY_FILE || 'perf/results/mcp-regression-summary.json';
 const htmlReportFile = __ENV.HTML_REPORT_FILE || 'perf/results/mcp-regression-report.html';
 const jsonHeaders = { headers: { 'Content-Type': 'application/json' } };
+const authedJsonHeaders = {
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiToken}`,
+  },
+};
+const authedHeaders = { headers: { Authorization: `Bearer ${apiToken}` } };
 
-function post(path, payload) {
-  return http.post(`${baseUrl}${path}`, JSON.stringify(payload), jsonHeaders);
+function post(path, payload, headers = jsonHeaders) {
+  return http.post(`${baseUrl}${path}`, JSON.stringify(payload), headers);
 }
 
-function get(path) {
-  return http.get(`${baseUrl}${path}`);
+function get(path, headers) {
+  return http.get(`${baseUrl}${path}`, headers);
 }
 
 function esc(value) {
@@ -172,52 +180,48 @@ export function handleSummary(data) {
 }
 
 export default function () {
-  group('tools endpoints', () => {
-    const driveRes = post('/mcp/tools/drive.search_files', {
-      query: 'roadmap',
-      pageSize: 5,
+  group('api/mcp auth checks', () => {
+    const unauthorizedToolsRes = get('/api/mcp/tools');
+    check(unauthorizedToolsRes, {
+      'api/mcp/tools without auth is 401': (r) => r.status === 401,
     });
 
-    check(driveRes, {
-      'drive.search_files status is 200': (r) => r.status === 200,
-      'drive.search_files has files': (r) => Array.isArray(r.json('files')),
-      'drive.search_files source exists': (r) => r.json('source') === 'google-drive',
-    });
-
-    const gmailRes = post('/mcp/tools/gmail.search_messages', {
-      query: 'from:alerts@example.com',
-      maxResults: 5,
-    });
-
-    check(gmailRes, {
-      'gmail.search_messages status is 200': (r) => r.status === 200,
-      'gmail.search_messages has messages': (r) => Array.isArray(r.json('messages')),
-    });
-
-    const newsRes = post('/mcp/tools/news.search_articles', {
-      query: 'spring boot',
-      limit: 5,
-    });
-
-    check(newsRes, {
-      'news.search_articles status is 200': (r) => r.status === 200,
-      'news.search_articles has articles': (r) => Array.isArray(r.json('articles')),
-      'news.search_articles has freshness': (r) => typeof r.json('freshness') === 'string',
-    });
-
-    const marketRes = post('/mcp/tools/market.quote', {
-      symbol: 'AAPL',
-    });
-
-    check(marketRes, {
-      'market.quote status is 200': (r) => r.status === 200,
-      'market.quote has quote.symbol': (r) => r.json('quote.symbol') === 'AAPL',
-      'market.quote has provider': (r) => typeof r.json('quote.provider') === 'string',
-      'market.quote has asOf': (r) => typeof r.json('asOf') === 'string',
+    const toolsRes = get('/api/mcp/tools', authedHeaders);
+    check(toolsRes, {
+      'api/mcp/tools with auth is 200': (r) => r.status === 200,
+      'api/mcp/tools returns an array': (r) => Array.isArray(r.json()),
+      'api/mcp/tools includes market.quote': (r) =>
+        Array.isArray(r.json()) && r.json().some((tool) => tool.id === 'market.quote'),
     });
   });
 
-  group('resource endpoints', () => {
+  group('api/mcp execute endpoint', () => {
+    const missingToolIdRes = post('/api/mcp/execute', { params: { query: 'foo' } }, authedJsonHeaders);
+    check(missingToolIdRes, {
+      'api/mcp/execute missing toolId is 400': (r) => r.status === 400,
+    });
+
+    const marketExecuteRes = post(
+      '/api/mcp/execute',
+      {
+        toolId: 'market.quote',
+        toolName: 'Market Quote',
+        params: { symbol: 'AAPL' },
+      },
+      authedJsonHeaders,
+    );
+
+    check(marketExecuteRes, {
+      'api/mcp/execute market.quote is 200': (r) => r.status === 200,
+      'api/mcp/execute response success true': (r) => r.json('success') === true,
+      'api/mcp/execute response toolId matches': (r) => r.json('toolId') === 'market.quote',
+      'api/mcp/execute response toolName matches': (r) => r.json('toolName') === 'Market Quote',
+      'api/mcp/execute response result is string': (r) => typeof r.json('result') === 'string',
+      'api/mcp/execute response simulated true': (r) => r.json('simulated') === true,
+    });
+  });
+
+  group('legacy mcp endpoints still healthy', () => {
     const newsSourcesRes = get('/mcp/resources/news/sources');
 
     check(newsSourcesRes, {

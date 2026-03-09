@@ -6,6 +6,7 @@ RESULT_DIR="${RESULT_DIR:-perf/results}"
 SUMMARY_FILE="${SUMMARY_FILE:-$RESULT_DIR/mcp-regression-summary.json}"
 HTML_REPORT_FILE="${HTML_REPORT_FILE:-$RESULT_DIR/mcp-regression-report.html}"
 LOG_FILE="${LOG_FILE:-$RESULT_DIR/k6-regression-run.log}"
+MCP_API_TOKEN="${MCP_API_TOKEN:-dev-token}"
 
 mkdir -p "$RESULT_DIR"
 
@@ -19,8 +20,8 @@ mkdir -p "$RESULT_DIR"
     exit 127
   fi
 
-  echo "$ BASE_URL=$BASE_URL SUMMARY_FILE=$SUMMARY_FILE HTML_REPORT_FILE=$HTML_REPORT_FILE k6 run perf/mcp-regression.k6.js"
-  BASE_URL="$BASE_URL" SUMMARY_FILE="$SUMMARY_FILE" HTML_REPORT_FILE="$HTML_REPORT_FILE" k6 run perf/mcp-regression.k6.js
+  echo "$ BASE_URL=$BASE_URL MCP_API_TOKEN=$MCP_API_TOKEN SUMMARY_FILE=$SUMMARY_FILE HTML_REPORT_FILE=$HTML_REPORT_FILE k6 run perf/mcp-regression.k6.js"
+  BASE_URL="$BASE_URL" MCP_API_TOKEN="$MCP_API_TOKEN" SUMMARY_FILE="$SUMMARY_FILE" HTML_REPORT_FILE="$HTML_REPORT_FILE" k6 run perf/mcp-regression.k6.js
 
   echo "JSON summary generated at: $SUMMARY_FILE"
   echo "HTML report generated at: $HTML_REPORT_FILE"
