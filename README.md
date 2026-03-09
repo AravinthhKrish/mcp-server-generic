@@ -236,3 +236,26 @@ curl -X POST http://localhost:8080/mcp/tools/market.quote \
 
 curl http://localhost:8080/mcp/resources/news/sources
 ```
+
+## Container image and Kubernetes autoscaling
+
+Build one container image for the application:
+
+```bash
+docker build -t mcp-server-generic:latest .
+```
+
+Deploy to Kubernetes with HPA enabled:
+
+```bash
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/hpa.yaml
+```
+
+Check rollout and autoscaler status:
+
+```bash
+kubectl rollout status deployment/mcp-server-generic
+kubectl get hpa mcp-server-generic
+```

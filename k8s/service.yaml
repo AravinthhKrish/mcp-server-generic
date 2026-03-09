@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-generic
+  labels:
+    app: mcp-server-generic
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-server-generic
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
