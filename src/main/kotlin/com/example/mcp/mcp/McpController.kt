@@ -22,7 +22,7 @@ class McpController(
     }
 
     @PostMapping("/news.search_articles")
-    fun newsSearchArticles(@Valid @RequestBody input: NewsSearchArticlesInput): NewsSearchArticlesOutput {
+    suspend fun newsSearchArticles(@Valid @RequestBody input: NewsSearchArticlesInput): NewsSearchArticlesOutput {
         return toolService.newsSearchArticles(input)
     }
 

@@ -11,10 +11,18 @@ integrations:
     user-id: me
     access-token: ""
   news:
-    enabled: false
+    enabled: true
+    connect-timeout-ms: 8000
+    read-timeout-ms: 15000
+    max-retries: 2
+    max-concurrent-sources: 4
+    blocked-hosts:
+      - pinterest.com
+      - instagram.com
+      - facebook.com
     sources:
-      - id: pinterest
-        url: https://www.pinterest.com/news.rss
+      - id: bbc
+        url: https://feeds.bbci.co.uk/news/world/rss.xml
         type: RSS
         enabled: true
         auth: NONE
@@ -24,17 +32,45 @@ integrations:
         enabled: true
         auth: NONE
       - id: github
-        url: https://api.github.com/repos/spring-projects/spring-boot/issues
+        url: https://api.github.com/search/repositories
         type: JSON
-        enabled: false
+        enabled: true
         auth: HEADER
         auth-header: Authorization
         auth-token: ""
         query-param: q
-      - id: world-times
-        url: https://example.com/world-times-feed
-        type: ATOM
-        enabled: false
+      - id: al-jazeera
+        url: https://www.aljazeera.com/xml/rss/all.xml
+        type: RSS
+        enabled: true
+        auth: BEARER
+        auth-token: ""
+        query-param: q
+      - id: hacker-news
+        url: https://news.ycombinator.com/rss
+        type: RSS
+        enabled: true
+        auth: BEARER
+        auth-token: ""
+        query-param: q
+      - id: pragmatic-engineer
+        url: https://blog.pragmaticengineer.com/rss/
+        type: RSS
+        enabled: true
+        auth: BEARER
+        auth-token: ""
+        query-param: q
+      - id: google-search
+        url: http://googleresearch.blogspot.com/atom.xml
+        type: RSS
+        enabled: true
+        auth: BEARER
+        auth-token: ""
+        query-param: q
+      - id: info-q
+        url: https://feed.infoq.com
+        type: RSS
+        enabled: true
         auth: BEARER
         auth-token: ""
         query-param: q
