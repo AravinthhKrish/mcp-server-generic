@@ -3,9 +3,11 @@ package com.example.mcp.domain.news
 import com.example.mcp.mcp.NewsSearchArticlesInput
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.web.reactive.function.client.WebClient
 import java.net.InetSocketAddress
 
 class ApiNewsAdapterTest {
@@ -45,8 +47,9 @@ class ApiNewsAdapterTest {
                 )
             )
 
-            val adapter = ApiNewsAdapter(properties, ObjectMapper())
-            val results = adapter.searchArticles(NewsSearchArticlesInput(query = "kotlin", limit = 10))
+            val webClient = NewsWebClientConfiguration().newsWebClient(WebClient.builder(), properties)
+            val adapter = ApiNewsAdapter(properties, ObjectMapper(), webClient)
+            val results = runBlocking { adapter.searchArticles(NewsSearchArticlesInput(query = "kotlin", limit = 10)) }
 
             assertEquals(2, results.size)
             assertTrue(results.any { it.source == "rss-source" })

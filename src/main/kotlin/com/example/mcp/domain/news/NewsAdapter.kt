@@ -4,27 +4,39 @@ import com.example.mcp.domain.Article
 import com.example.mcp.mcp.NewsSearchArticlesInput
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.reactor.awaitSingleOrNull
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
-import org.springframework.web.client.RestClient
+import org.springframework.web.reactive.function.client.WebClient
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
 import java.io.StringReader
 import java.net.URI
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import javax.xml.parsers.DocumentBuilderFactory
 
 interface NewsAdapter {
-    fun searchArticles(input: NewsSearchArticlesInput): List<Article>
+    suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article>
 }
 
 @Component
 @ConditionalOnProperty(prefix = "integrations.news", name = ["enabled"], havingValue = "false", matchIfMissing = true)
 class StubNewsAdapter : NewsAdapter {
-    override fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
+    override suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
         return listOf(
             Article(
                 id = "art_001",
@@ -44,22 +56,34 @@ class StubNewsAdapter : NewsAdapter {
 @ConditionalOnProperty(prefix = "integrations.news", name = ["enabled"], havingValue = "true")
 class ApiNewsAdapter(
     private val properties: NewsProperties,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @Qualifier("newsWebClient") private val newsWebClient: WebClient
 ) : NewsAdapter {
-    private val restClient = RestClient.builder().build()
+    private val logger = LoggerFactory.getLogger(ApiNewsAdapter::class.java)
 
-    override fun searchArticles(input: NewsSearchArticlesInput): List<Article> {
+    override suspend fun searchArticles(input: NewsSearchArticlesInput): List<Article> = coroutineScope {
         val selectedSources = properties.sources
             .asSequence()
             .filter { it.enabled }
             .filter { input.sources.isEmpty() || input.sources.contains(it.id) }
+            .filter(::isAllowedSource)
             .toList()
 
-        val aggregated = selectedSources.flatMap { source ->
-            runCatching { fetchFromSource(source, input) }.getOrDefault(emptyList())
-        }
+        val concurrencyLimit = properties.maxConcurrentSources.coerceAtLeast(1)
+        val semaphore = Semaphore(concurrencyLimit)
 
-        return aggregated
+        val aggregated = selectedSources
+            .map { source ->
+                async {
+                    semaphore.withPermit {
+                        fetchWithIsolation(source, input)
+                    }
+                }
+            }
+            .awaitAll()
+            .flatten()
+
+        aggregated
             .filter { matchesQuery(it, input.query) }
             .filter { input.from == null || !it.publishedAt.isBefore(input.from) }
             .filter { input.to == null || !it.publishedAt.isAfter(input.to) }
@@ -67,17 +91,52 @@ class ApiNewsAdapter(
             .take(input.limit)
     }
 
-    private fun fetchFromSource(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
-        val responseBody = restClient.get()
+    private fun isAllowedSource(source: NewsSourceConfig): Boolean {
+        val host = runCatching { URI.create(source.url).host?.lowercase().orEmpty() }.getOrDefault("")
+        if (host.isBlank()) {
+            logger.warn("Skipping news source '{}' due to invalid host in url='{}'", source.id, source.url)
+            return false
+        }
+
+        if (properties.blockedHosts.any { host.contains(it.lowercase()) }) {
+            logger.warn("Skipping news source '{}' because host '{}' is blocked", source.id, host)
+            return false
+        }
+
+        if (properties.allowedHosts.isNotEmpty() && properties.allowedHosts.none { host.contains(it.lowercase()) }) {
+            logger.warn("Skipping news source '{}' because host '{}' is not in allow-list", source.id, host)
+            return false
+        }
+
+        return true
+    }
+
+    private suspend fun fetchWithIsolation(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
+        val host = runCatching { URI.create(source.url).host ?: "unknown" }.getOrDefault("unknown")
+        return runCatching {
+            val articles = fetchFromSource(source, input)
+            logger.info("news source completed source={} host={} articles={}", source.id, host, articles.size)
+            articles
+        }.getOrElse { ex ->
+            logger.warn("news source failed source={} host={} error={}", source.id, host, ex.toString())
+            emptyList()
+        }
+    }
+
+    private suspend fun fetchFromSource(source: NewsSourceConfig, input: NewsSearchArticlesInput): List<Article> {
+        val responseBody = newsWebClient.get()
             .uri(buildUri(source, input.query))
             .headers { headers -> addAuthHeaders(headers, source) }
             .retrieve()
-            .body(String::class.java)
+            .bodyToMono(String::class.java)
+            .awaitSingleOrNull()
             ?: return emptyList()
 
-        return when (source.type) {
-            SourceType.RSS, SourceType.ATOM -> parseXmlFeed(responseBody, source.id)
-            SourceType.JSON -> parseJsonFeed(responseBody, source.id)
+        return withContext(Dispatchers.IO) {
+            when (source.type) {
+                SourceType.RSS, SourceType.ATOM -> parseXmlFeed(responseBody, source.id)
+                SourceType.JSON -> parseJsonFeed(responseBody, source.id)
+            }
         }
     }
 
@@ -85,7 +144,8 @@ class ApiNewsAdapter(
         val base = URI.create(source.url)
         val queryParam = source.queryParam ?: return base
         val separator = if (base.query.isNullOrBlank()) "?" else "&"
-        return URI.create("${source.url}$separator$queryParam=$query")
+        val encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        return URI.create("${source.url}$separator$queryParam=$encodedQuery")
     }
 
     private fun addAuthHeaders(headers: org.springframework.http.HttpHeaders, source: NewsSourceConfig) {
@@ -96,6 +156,7 @@ class ApiNewsAdapter(
                     headers.setBearerAuth(source.authToken)
                 }
             }
+
             SourceAuth.HEADER -> {
                 if (source.authToken.isNotBlank()) {
                     headers.set(source.authHeader, source.authToken)
@@ -163,18 +224,27 @@ class ApiNewsAdapter(
 
     private fun parseJsonFeed(body: String, sourceId: String): List<Article> {
         val root = objectMapper.readTree(body)
-        val items = when {
+        val articleNodes = when {
             root.isArray -> root
-            root.path("articles").isArray -> root.path("articles")
-            root.path("items").isArray -> root.path("items")
-            else -> objectMapper.createArrayNode()
+            root.has("articles") -> root.path("articles")
+            root.has("items") -> root.path("items")
+            else -> return emptyList()
         }
 
-        return items.map { node ->
-            val title = node.path("title").asText("")
+        if (!articleNodes.isArray) return emptyList()
+
+        return articleNodes.mapNotNull { node ->
+            val title = node.path("title").asText("").trim()
             val url = node.path("url").asText(node.path("link").asText(""))
-            val publishedRaw = node.path("publishedAt").asText(node.path("published_at").asText(""))
-            val publishedAt = parseDate(publishedRaw)
+            if (title.isBlank() && url.isBlank()) return@mapNotNull null
+
+            val publishedAt = parseDate(
+                node.path("publishedAt").asText(
+                    node.path("pubDate").asText(
+                        node.path("date").asText(null)
+                    )
+                )
+            )
             val author = node.path("author").asText(null)
             val summary = node.path("description").asText(node.path("summary").asText(null))
 

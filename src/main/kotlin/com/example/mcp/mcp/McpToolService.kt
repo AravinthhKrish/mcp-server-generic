@@ -34,7 +34,7 @@ class McpToolService(
         return GmailSearchMessagesOutput(messages = messages, nextPageToken = nextPageToken)
     }
 
-    fun newsSearchArticles(input: NewsSearchArticlesInput): NewsSearchArticlesOutput {
+    suspend fun newsSearchArticles(input: NewsSearchArticlesInput): NewsSearchArticlesOutput {
         logger.info("news.search_articles request received query='{}' limit={} sourcesCount={}", input.query, input.limit, input.sources.size)
         val articles = newsAdapter.searchArticles(input)
         logger.info("news.search_articles completed articleCount={} freshness={}", articles.size, "near-real-time")
