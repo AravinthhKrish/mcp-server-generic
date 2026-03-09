@@ -45,6 +45,20 @@ class McpToolService(
         )
     }
 
+
+    suspend fun webSearch(input: WebSearchInput): WebSearchOutput {
+        logger.info("web_search request received query='{}' limit={} sourcesCount={}", input.query, input.limit, input.sources.size)
+        val articles = newsAdapter.searchArticles(
+            NewsSearchArticlesInput(
+                query = input.query,
+                sources = input.sources,
+                limit = input.limit,
+                language = input.language
+            )
+        )
+        logger.info("web_search completed resultCount={}", articles.size)
+        return WebSearchOutput(results = articles, freshness = "near-real-time")
+    }
     fun marketQuote(input: MarketQuoteInput): MarketQuoteOutput {
         val normalizedSymbol = input.symbol.uppercase()
         val cacheKey = "quote:${input.providerPreference ?: "default"}:$normalizedSymbol"

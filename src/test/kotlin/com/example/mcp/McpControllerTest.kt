@@ -24,4 +24,19 @@ class McpControllerTest(
             .jsonPath("$.quote.symbol").isEqualTo("AAPL")
             .jsonPath("$.quote.provider").exists()
     }
+
+
+    @Test
+    fun `web search returns payload`() {
+        webTestClient.post()
+            .uri("/mcp/tools/web_search")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"query":"kotlin","limit":2}""")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.results").isArray
+            .jsonPath("$.freshness").isEqualTo("near-real-time")
+    }
+
 }

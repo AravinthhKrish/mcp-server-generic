@@ -50,6 +50,18 @@ data class NewsSearchArticlesOutput(
     val freshness: String
 )
 
+data class WebSearchInput(
+    @field:NotBlank val query: String,
+    val sources: List<String> = emptyList(),
+    @field:Min(1) @field:Max(50) val limit: Int = 10,
+    val language: String? = null
+)
+
+data class WebSearchOutput(
+    val results: List<Article>,
+    val freshness: String
+)
+
 data class MarketQuoteInput(
     @field:NotBlank val symbol: String,
     val providerPreference: String? = null,

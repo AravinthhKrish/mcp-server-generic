@@ -59,4 +59,22 @@ class ApiMcpControllerTest(
             .jsonPath("$.result").isNotEmpty
             .jsonPath("$.simulated").isEqualTo(true)
     }
+
+
+    @Test
+    fun `execute endpoint supports web search tool`() {
+        webTestClient.post()
+            .uri("/api/mcp/execute")
+            .header("Authorization", "Bearer dev-token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"toolId":"web_search","toolName":"Web Search","params":{"query":"kotlin","limit":2}}""")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.success").isEqualTo(true)
+            .jsonPath("$.toolId").isEqualTo("web_search")
+            .jsonPath("$.toolName").isEqualTo("Web Search")
+            .jsonPath("$.result").isNotEmpty
+    }
+
 }

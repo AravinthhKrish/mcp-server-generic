@@ -89,6 +89,19 @@ class ApiMcpController(
             )
         ),
         ToolSpec(
+            id = "web_search",
+            name = "Web Search",
+            category = "search",
+            requiresParams = true,
+            description = "Search the web for current information",
+            params = listOf(
+                ToolParamSpec("query", "string", true, "Search query"),
+                ToolParamSpec("sources", "array", false, "Preferred source IDs"),
+                ToolParamSpec("limit", "number", false, "Maximum results (1-50)"),
+                ToolParamSpec("language", "string", false, "Language filter")
+            )
+        ),
+        ToolSpec(
             id = "market.quote",
             name = "Market Quote",
             category = "finance",
@@ -127,6 +140,11 @@ class ApiMcpController(
             "news.search_articles" -> {
                 val input = objectMapper.convertValue(request.params, NewsSearchArticlesInput::class.java)
                 toolService.newsSearchArticles(input)
+            }
+
+            "web_search" -> {
+                val input = objectMapper.convertValue(request.params, WebSearchInput::class.java)
+                toolService.webSearch(input)
             }
 
             "market.quote" -> {
