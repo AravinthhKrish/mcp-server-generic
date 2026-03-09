@@ -7,6 +7,7 @@ data class NewsProperties(
     val enabled: Boolean = false,
     val connectTimeoutMs: Long = 8000,
     val readTimeoutMs: Long = 15000,
+    val maxInMemorySize: Int = 1024 * 1000,
     val maxRetries: Int = 2,
     val maxConcurrentSources: Int = 4,
     val allowedHosts: List<String> = emptyList(),

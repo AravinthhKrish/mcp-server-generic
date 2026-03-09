@@ -41,6 +41,9 @@ class NewsWebClientConfiguration {
             }
 
         return builder
+            .codecs {
+                it.defaultCodecs().maxInMemorySize(properties.maxInMemorySize)
+            }
             .clientConnector(ReactorClientHttpConnector(httpClient))
             .filter(retryFilter(properties.maxRetries))
             .build()
