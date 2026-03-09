@@ -10,6 +10,11 @@ integrations:
     base-url: https://gmail.googleapis.com/gmail/v1
     user-id: me
     access-token: ""
+  market:
+    enabled: false
+    base-url: ""
+    quote-path: /mcp/tools/market.quote
+    auth-token: ""
   news:
     enabled: true
     connect-timeout-ms: 8000
