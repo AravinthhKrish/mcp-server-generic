@@ -268,11 +268,24 @@ class ApiNewsAdapter(
     }
 
     private fun matchesQuery(article: Article, query: String): Boolean {
-        val q = query.trim().lowercase()
-        if (q.isBlank()) return true
-        return article.title.lowercase().contains(q) ||
-            article.summary?.lowercase()?.contains(q) == true ||
-            article.tags.any { tag -> tag.lowercase().contains(q) }
+        val queryWords = query
+            .trim()
+            .lowercase()
+            .split(Regex("""\W+"""))
+            .filter { it.length >= 2 }
+
+        if (queryWords.isEmpty()) return true
+
+        val searchableText = buildString {
+            append(article.title.lowercase())
+            append(' ')
+            append(article.summary?.lowercase().orEmpty())
+            append(' ')
+            append(article.tags.joinToString(" ") { it.lowercase() })
+        }
+
+        val matchedWordCount = queryWords.count { word -> searchableText.contains(word) }
+        return matchedWordCount > 0
     }
 
     private fun childText(element: Element, tag: String): String? {
