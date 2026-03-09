@@ -28,8 +28,8 @@ class NewsWebClientConfiguration {
             .compress(true)
             .doOnConnected { connection ->
                 val timeoutSeconds = (properties.readTimeoutMs / 1000).coerceAtLeast(1)
-                connection.addHandlerLast(ReadTimeoutHandler(timeoutSeconds))
-                connection.addHandlerLast(WriteTimeoutHandler(timeoutSeconds))
+                connection.addHandlerLast(ReadTimeoutHandler(timeoutSeconds.toInt()))
+                connection.addHandlerLast(WriteTimeoutHandler(timeoutSeconds.toInt()))
             }
             .headers { headers ->
                 headers.add(HttpHeaders.USER_AGENT, "Mozilla/5.0")

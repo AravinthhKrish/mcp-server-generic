@@ -11,7 +11,7 @@ integrations:
     user-id: me
     access-token: ""
   news:
-    enabled: false
+    enabled: true
     connect-timeout-ms: 8000
     read-timeout-ms: 15000
     max-retries: 2
