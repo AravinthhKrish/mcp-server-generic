@@ -33,7 +33,7 @@ class McpController(
     }
 
     @PostMapping("/market.quote")
-    fun marketQuote(@Valid @RequestBody input: MarketQuoteInput): MarketQuoteOutput {
+    suspend fun marketQuote(@Valid @RequestBody input: MarketQuoteInput): MarketQuoteOutput {
         return toolService.marketQuote(input)
     }
 }

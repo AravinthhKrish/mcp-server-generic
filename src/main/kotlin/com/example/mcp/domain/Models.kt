@@ -43,5 +43,6 @@ data class Quote(
     val change: Double,
     val changePercent: Double,
     val timestamp: Instant,
-    val provider: String
+    val provider: String,
+    val data: Map<String, Any>
 )

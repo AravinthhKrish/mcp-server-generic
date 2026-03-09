@@ -69,6 +69,6 @@ data class MarketQuoteInput(
 )
 
 data class MarketQuoteOutput(
-    val quote: Quote,
+    val quote: List<Quote>,
     val asOf: Instant
 )

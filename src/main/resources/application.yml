@@ -11,8 +11,8 @@ integrations:
     user-id: me
     access-token: ""
   market:
-    enabled: false
-    base-url: ""
+    enabled: true
+    base-url: https://mcp.kite.trade/mcp
     quote-path: /mcp/tools/market.quote
     auth-token: ""
   news:

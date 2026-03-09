@@ -59,7 +59,7 @@ class McpToolService(
         logger.info("web_search completed resultCount={}", articles.size)
         return WebSearchOutput(results = articles, freshness = "near-real-time")
     }
-    fun marketQuote(input: MarketQuoteInput): MarketQuoteOutput {
+    suspend fun marketQuote(input: MarketQuoteInput): MarketQuoteOutput {
         val normalizedSymbol = input.symbol.uppercase()
         val cacheKey = "quote:${input.providerPreference ?: "default"}:$normalizedSymbol"
         val cached: MarketQuoteOutput? = cacheService.get(cacheKey)
@@ -74,7 +74,7 @@ class McpToolService(
             asOf = Instant.now()
         )
         cacheService.put(cacheKey, output, Duration.ofSeconds(15))
-        logger.info("market.quote completed symbol='{}' provider='{}'", output.quote.symbol, output.quote.provider)
+        logger.info("market.quote completed symbol='{}' provider='{}'", output.quote.firstOrNull()?.symbol, output.quote.firstOrNull()?.provider)
         return output
     }
 }

@@ -1,5 +1,6 @@
 package com.example.mcp.mcp
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -35,7 +36,7 @@ data class ExecuteToolResponse(
     val success: Boolean,
     val toolId: String,
     val toolName: String,
-    val result: String,
+    val result: Map<String, Any>,
     val simulated: Boolean? = null
 )
 
@@ -159,7 +160,7 @@ class ApiMcpController(
             success = true,
             toolId = requestedToolId,
             toolName = request.toolName ?: tool.name,
-            result = objectMapper.writeValueAsString(resultPayload),
+            result = objectMapper.convertValue(resultPayload, object: TypeReference<Map<String, Any>>(){}),
             simulated = true
         )
     }
