@@ -26,6 +26,12 @@ class McpController(
         return toolService.newsSearchArticles(input)
     }
 
+
+    @PostMapping("/web_search")
+    suspend fun webSearch(@Valid @RequestBody input: WebSearchInput): WebSearchOutput {
+        return toolService.webSearch(input)
+    }
+
     @PostMapping("/market.quote")
     fun marketQuote(@Valid @RequestBody input: MarketQuoteInput): MarketQuoteOutput {
         return toolService.marketQuote(input)
