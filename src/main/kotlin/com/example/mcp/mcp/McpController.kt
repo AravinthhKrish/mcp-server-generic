@@ -16,6 +16,21 @@ class McpController(
         return toolService.driveSearchFiles(input)
     }
 
+    @PostMapping("/drive.create_folder")
+    fun driveCreateFolder(@Valid @RequestBody input: DriveCreateFolderInput): DriveCreateFolderOutput {
+        return toolService.driveCreateFolder(input)
+    }
+
+    @PostMapping("/drive.upload_file")
+    fun driveUploadFile(@Valid @RequestBody input: DriveUploadFileInput): DriveUploadFileOutput {
+        return toolService.driveUploadFile(input)
+    }
+
+    @PostMapping("/drive.file_metadata")
+    fun driveFileMetadata(@Valid @RequestBody input: DriveGetFileMetadataInput): DriveGetFileMetadataOutput {
+        return toolService.driveGetFileMetadata(input)
+    }
+
     @PostMapping("/gmail.search_messages")
     fun gmailSearchMessages(@Valid @RequestBody input: GmailSearchMessagesInput): GmailSearchMessagesOutput {
         return toolService.gmailSearchMessages(input)

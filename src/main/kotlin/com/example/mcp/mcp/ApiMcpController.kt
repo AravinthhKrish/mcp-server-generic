@@ -62,6 +62,43 @@ class ApiMcpController(
             )
         ),
         ToolSpec(
+            id = "drive.create_folder",
+            name = "Drive Create Folder",
+            category = "productivity",
+            requiresParams = true,
+            description = "Create a folder in Google Drive",
+            params = listOf(
+                ToolParamSpec("name", "string", true, "Folder name"),
+                ToolParamSpec("parentFolderId", "string", false, "Optional parent folder id"),
+                ToolParamSpec("accessToken", "string", false, "Optional Google Drive bearer token override")
+            )
+        ),
+        ToolSpec(
+            id = "drive.upload_file",
+            name = "Drive Upload File",
+            category = "productivity",
+            requiresParams = true,
+            description = "Upload a file to Google Drive",
+            params = listOf(
+                ToolParamSpec("name", "string", true, "File name"),
+                ToolParamSpec("contentBase64", "string", true, "Base64 encoded file content"),
+                ToolParamSpec("mimeType", "string", false, "File MIME type"),
+                ToolParamSpec("parentFolderId", "string", false, "Optional parent folder id"),
+                ToolParamSpec("accessToken", "string", false, "Optional Google Drive bearer token override")
+            )
+        ),
+        ToolSpec(
+            id = "drive.file_metadata",
+            name = "Drive File Metadata",
+            category = "productivity",
+            requiresParams = true,
+            description = "Fetch metadata for a Google Drive file",
+            params = listOf(
+                ToolParamSpec("fileId", "string", true, "Google Drive file id"),
+                ToolParamSpec("accessToken", "string", false, "Optional Google Drive bearer token override")
+            )
+        ),
+        ToolSpec(
             id = "gmail.search_messages",
             name = "Gmail Message Search",
             category = "productivity",
@@ -131,6 +168,21 @@ class ApiMcpController(
             "drive.search_files" -> {
                 val input = objectMapper.convertValue(request.params, DriveSearchFilesInput::class.java)
                 toolService.driveSearchFiles(input)
+            }
+
+            "drive.create_folder" -> {
+                val input = objectMapper.convertValue(request.params, DriveCreateFolderInput::class.java)
+                toolService.driveCreateFolder(input)
+            }
+
+            "drive.upload_file" -> {
+                val input = objectMapper.convertValue(request.params, DriveUploadFileInput::class.java)
+                toolService.driveUploadFile(input)
+            }
+
+            "drive.file_metadata" -> {
+                val input = objectMapper.convertValue(request.params, DriveGetFileMetadataInput::class.java)
+                toolService.driveGetFileMetadata(input)
             }
 
             "gmail.search_messages" -> {

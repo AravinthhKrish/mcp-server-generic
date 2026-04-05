@@ -27,6 +27,33 @@ class McpToolService(
         return DriveSearchFilesOutput(files = files, nextPageToken = nextPageToken)
     }
 
+    fun driveCreateFolder(input: DriveCreateFolderInput): DriveCreateFolderOutput {
+        logger.info("drive.create_folder request received name='{}' hasParent={}", input.name, !input.parentFolderId.isNullOrBlank())
+        val folder = driveAdapter.createFolder(input)
+        logger.info("drive.create_folder completed folderId='{}'", folder.id)
+        return DriveCreateFolderOutput(folder = folder)
+    }
+
+    fun driveUploadFile(input: DriveUploadFileInput): DriveUploadFileOutput {
+        logger.info(
+            "drive.upload_file request received name='{}' mimeType='{}' hasParent={} contentLength={}",
+            input.name,
+            input.mimeType,
+            !input.parentFolderId.isNullOrBlank(),
+            input.contentBase64.length
+        )
+        val file = driveAdapter.uploadFile(input)
+        logger.info("drive.upload_file completed fileId='{}'", file.id)
+        return DriveUploadFileOutput(file = file)
+    }
+
+    fun driveGetFileMetadata(input: DriveGetFileMetadataInput): DriveGetFileMetadataOutput {
+        logger.info("drive.file_metadata request received fileId='{}'", input.fileId)
+        val file = driveAdapter.getFileMetadata(input)
+        logger.info("drive.file_metadata completed fileId='{}' mimeType='{}'", file.id, file.mimeType)
+        return DriveGetFileMetadataOutput(file = file)
+    }
+
     fun gmailSearchMessages(input: GmailSearchMessagesInput): GmailSearchMessagesOutput {
         logger.info("gmail.search_messages request received query='{}' maxResults={} labelsCount={}", input.query, input.maxResults, input.labels.size)
         val (messages, nextPageToken) = gmailAdapter.searchMessages(input)

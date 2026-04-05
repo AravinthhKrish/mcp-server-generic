@@ -7,7 +7,13 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.reactive.server.WebTestClient
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = [
+        "integrations.news.enabled=false",
+        "integrations.market.enabled=false"
+    ]
+)
 @AutoConfigureWebTestClient
 class ApiMcpControllerTest(
     @Autowired private val webTestClient: WebTestClient
@@ -28,8 +34,9 @@ class ApiMcpControllerTest(
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$[0].id").exists()
-            .jsonPath("$[0].name").exists()
+            .jsonPath("$[?(@.id == 'drive.create_folder')]").exists()
+            .jsonPath("$[?(@.id == 'drive.upload_file')]").exists()
+            .jsonPath("$[?(@.id == 'drive.file_metadata')]").exists()
     }
 
     @Test
@@ -58,6 +65,38 @@ class ApiMcpControllerTest(
             .jsonPath("$.toolName").isEqualTo("Market Quote")
             .jsonPath("$.result").isNotEmpty
             .jsonPath("$.simulated").isEqualTo(true)
+    }
+
+    @Test
+    fun `execute endpoint supports drive upload tool`() {
+        webTestClient.post()
+            .uri("/api/mcp/execute")
+            .header("Authorization", "Bearer dev-token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"toolId":"drive.upload_file","toolName":"Drive Upload File","params":{"name":"reel.mp4","mimeType":"video/mp4","contentBase64":"aGVsbG8=","parentFolderId":"folder_001"}}""")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.success").isEqualTo(true)
+            .jsonPath("$.toolId").isEqualTo("drive.upload_file")
+            .jsonPath("$.toolName").isEqualTo("Drive Upload File")
+            .jsonPath("$.result.file.id").isEqualTo("file_upload_001")
+            .jsonPath("$.result.file.sizeBytes").isEqualTo(5)
+    }
+
+    @Test
+    fun `execute endpoint supports drive metadata tool`() {
+        webTestClient.post()
+            .uri("/api/mcp/execute")
+            .header("Authorization", "Bearer dev-token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"toolId":"drive.file_metadata","toolName":"Drive File Metadata","params":{"fileId":"file_upload_001"}}""")
+            .exchange()
+            .expectStatus().isOk
+            .expectBody()
+            .jsonPath("$.success").isEqualTo(true)
+            .jsonPath("$.toolId").isEqualTo("drive.file_metadata")
+            .jsonPath("$.result.file.mimeType").isEqualTo("video/mp4")
     }
 
 

@@ -5,6 +5,11 @@ server:
   port: 8080
 
 integrations:
+  drive:
+    enabled: false
+    base-url: https://www.googleapis.com/drive/v3
+    upload-base-url: https://www.googleapis.com/upload/drive/v3
+    access-token: ""
   gmail:
     enabled: false
     base-url: https://gmail.googleapis.com/gmail/v1

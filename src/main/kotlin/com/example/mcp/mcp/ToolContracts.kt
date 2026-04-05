@@ -23,6 +23,40 @@ data class DriveSearchFilesOutput(
     val source: String = "google-drive"
 )
 
+data class DriveCreateFolderInput(
+    @field:NotBlank val name: String,
+    val parentFolderId: String? = null,
+    val accessToken: String? = null
+)
+
+data class DriveCreateFolderOutput(
+    val folder: DriveFile,
+    val source: String = "google-drive"
+)
+
+data class DriveUploadFileInput(
+    @field:NotBlank val name: String,
+    @field:NotBlank val contentBase64: String,
+    val mimeType: String = "application/octet-stream",
+    val parentFolderId: String? = null,
+    val accessToken: String? = null
+)
+
+data class DriveUploadFileOutput(
+    val file: DriveFile,
+    val source: String = "google-drive"
+)
+
+data class DriveGetFileMetadataInput(
+    @field:NotBlank val fileId: String,
+    val accessToken: String? = null
+)
+
+data class DriveGetFileMetadataOutput(
+    val file: DriveFile,
+    val source: String = "google-drive"
+)
+
 data class GmailSearchMessagesInput(
     @field:NotBlank val query: String,
     val labels: List<String> = emptyList(),

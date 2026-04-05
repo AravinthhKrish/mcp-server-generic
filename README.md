@@ -7,6 +7,9 @@ Kotlin/Spring starter implementation of a **single Data Access MCP server** with
 1. **MCP layer**
    * Tool endpoints (phase-1):
      * `drive.search_files`
+     * `drive.create_folder`
+     * `drive.upload_file`
+     * `drive.file_metadata`
      * `gmail.search_messages`
      * `news.search_articles`
      * `market.quote`
@@ -94,7 +97,7 @@ BASE_URL=http://localhost:8080 VUS=2 ITERATIONS=5 k6 run perf/mcp-regression.k6.
 Latest run output is captured in `perf/results/k6-regression-run.log`, JSON summary is written to `perf/results/mcp-regression-summary.json`, and a readable dynamic HTML report is generated at `perf/results/mcp-regression-report.html` directly by k6 (`handleSummary`).
 
 The script validates:
-- Tool endpoints: `drive.search_files`, `gmail.search_messages`, `news.search_articles`, `market.quote`
+- Tool endpoints: `drive.search_files`, `drive.create_folder`, `drive.upload_file`, `drive.file_metadata`, `gmail.search_messages`, `news.search_articles`, `market.quote`
 - Resource endpoints: `/mcp/resources/news/sources`, `/mcp/resources/system/provider-health`
 
 ## Sample calls
@@ -103,6 +106,10 @@ The script validates:
 curl -X POST http://localhost:8080/mcp/tools/market.quote \
   -H 'content-type: application/json' \
   -d '{"symbol":"AAPL"}'
+
+curl -X POST http://localhost:8080/mcp/tools/drive.upload_file \
+  -H 'content-type: application/json' \
+  -d '{"name":"reel.mp4","mimeType":"video/mp4","contentBase64":"aGVsbG8=","parentFolderId":"folder_001"}'
 
 curl http://localhost:8080/mcp/resources/news/sources
 ```
@@ -192,6 +199,25 @@ When enabled, `gmail.search_messages` calls:
 - `GET /users/{userId}/messages/{messageId}?format=metadata`
 
 and normalizes results into `MailMessage`.
+
+## Drive real-API mode
+
+By default, Drive uses a stub adapter. To connect to live Google Drive data, enable Drive integration and provide either a default OAuth bearer token in config or an `accessToken` directly in each Drive request.
+
+```yaml
+integrations:
+  drive:
+    enabled: true
+    base-url: https://www.googleapis.com/drive/v3
+    upload-base-url: https://www.googleapis.com/upload/drive/v3
+    access-token: ${GOOGLE_DRIVE_ACCESS_TOKEN}
+```
+
+Live Drive support covers:
+- `drive.search_files`
+- `drive.create_folder`
+- `drive.upload_file`
+- `drive.file_metadata`
 
 ## News multi-source real-API mode
 
