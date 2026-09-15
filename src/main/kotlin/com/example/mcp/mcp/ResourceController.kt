@@ -11,24 +11,30 @@ data class McpResource<T>(
 
 @RestController
 @RequestMapping("/mcp/resources")
-class ResourceController {
+class ResourceController(
+    private val news: com.example.mcp.domain.news.NewsProperties,
+    private val environment: org.springframework.core.env.Environment
+) {
     @GetMapping("/news/sources")
     fun newsSources(): McpResource<List<Map<String, String>>> = McpResource(
         uri = "resource://news/sources",
-        data = listOf(
-            mapOf("sourceId" to "reuters", "type" to "rss"),
-            mapOf("sourceId" to "alpha-vantage-news", "type" to "api")
-        )
+        data = news.sources.filter { it.enabled }.map {
+            mapOf("sourceId" to it.id, "type" to it.type.name.lowercase())
+        }
     )
 
     @GetMapping("/system/provider-health")
     fun providerHealth(): McpResource<Map<String, String>> = McpResource(
         uri = "resource://system/provider-health",
         data = mapOf(
-            "google-drive" to "unknown",
-            "gmail" to "unknown",
-            "news" to "healthy",
-            "market" to "healthy"
+            "google-drive" to status("drive"),
+            "gmail" to status("gmail"),
+            "news" to status("news"),
+            "market" to status("market")
         )
     )
+
+    private fun status(provider: String): String =
+        if (environment.getProperty("integrations.$provider.enabled", Boolean::class.java, false))
+            "unknown" else "stub"
 }

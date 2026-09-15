@@ -19,6 +19,156 @@ import java.util.concurrent.atomic.AtomicReference
 
 class ApiGoogleDriveAdapterTest {
     @Test
+    fun `read file text uses bounded media request`() {
+        val range = AtomicReference<String>()
+        val server = HttpServer.create(InetSocketAddress(0), 0)
+        server.createContext("/drive/files/text-file") { exchange ->
+            if (exchange.requestURI.query.orEmpty().contains("alt=media")) {
+                range.set(exchange.requestHeaders.getFirst("Range"))
+                val body = "hello"
+                exchange.sendResponseHeaders(200, body.toByteArray().size.toLong())
+                exchange.responseBody.use { it.write(body.toByteArray()) }
+            } else {
+                respondJson(exchange, """{
+                    "id":"text-file","name":"notes.txt","mimeType":"text/plain",
+                    "modifiedTime":"2026-04-05T10:15:30Z","size":"5"
+                }""")
+            }
+        }
+        server.start()
+        try {
+            val adapter = ApiGoogleDriveAdapter(DriveProperties(
+                enabled = true,
+                baseUrl = "http://localhost:${server.address.port}/drive",
+                accessToken = "token"
+            ), ObjectMapper())
+            val output = adapter.readFileText(com.example.mcp.mcp.DriveReadFileTextInput("text-file", 3))
+            assertEquals("hel", output.text)
+            assertTrue(output.truncated)
+            assertEquals("bytes=0-12", range.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `metadata retries rate limits before succeeding`() {
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val server = HttpServer.create(InetSocketAddress(0), 0)
+        server.createContext("/drive/files/retry-file") { exchange ->
+            if (calls.incrementAndGet() == 1) {
+                exchange.sendResponseHeaders(429, -1)
+                exchange.close()
+            } else {
+                respondJson(exchange, """{
+                    "id":"retry-file","name":"reel.mp4","mimeType":"video/mp4",
+                    "modifiedTime":"2026-04-05T10:15:30Z","size":"5"
+                }""")
+            }
+        }
+        server.start()
+        try {
+            val adapter = ApiGoogleDriveAdapter(DriveProperties(
+                enabled = true,
+                baseUrl = "http://localhost:${server.address.port}/drive",
+                uploadBaseUrl = "http://localhost:${server.address.port}/upload",
+                accessToken = "token",
+                maxRetries = 1,
+                retryBackoffMs = 1
+            ), ObjectMapper())
+            assertEquals("retry-file", adapter.getFileMetadata(DriveGetFileMetadataInput("retry-file")).id)
+            assertEquals(2, calls.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `resumable upload follows Google chunk protocol`() {
+        val initiationHeaders = AtomicReference<com.sun.net.httpserver.Headers>()
+        val ranges = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val server = HttpServer.create(InetSocketAddress(0), 0)
+        server.createContext("/upload/files") { exchange ->
+            initiationHeaders.set(exchange.requestHeaders)
+            exchange.requestBody.readAllBytes()
+            exchange.responseHeaders.add("Location", "http://localhost:${server.address.port}/session/1")
+            exchange.sendResponseHeaders(200, -1)
+            exchange.close()
+        }
+        server.createContext("/session/1") { exchange ->
+            ranges += exchange.requestHeaders.getFirst("Content-Range")
+            exchange.requestBody.readAllBytes()
+            if (ranges.size == 1) {
+                exchange.responseHeaders.add("Range", "bytes=0-262143")
+                exchange.sendResponseHeaders(308, -1)
+                exchange.close()
+            } else {
+                respondJson(exchange, """{
+                    "id":"resumable-file","name":"reel.mp4","mimeType":"video/mp4",
+                    "modifiedTime":"2026-04-05T10:15:30Z","size":"262149"
+                }""")
+            }
+        }
+        server.start()
+        try {
+            val adapter = ApiGoogleDriveAdapter(DriveProperties(
+                enabled = true,
+                baseUrl = "http://localhost:${server.address.port}/drive",
+                uploadBaseUrl = "http://localhost:${server.address.port}/upload",
+                accessToken = "configured-token"
+            ), ObjectMapper())
+            val first = ByteArray(256 * 1024) { 1 }
+            val second = "hello".toByteArray()
+            val started = adapter.startResumableUpload(com.example.mcp.mcp.DriveStartResumableUploadInput(
+                "reel.mp4", (first.size + second.size).toLong(), "video/mp4"
+            ))
+            assertEquals("video/mp4", initiationHeaders.get().getFirst("X-Upload-Content-Type"))
+            assertEquals("262149", initiationHeaders.get().getFirst("X-Upload-Content-Length"))
+
+            val progress = adapter.uploadChunk(com.example.mcp.mcp.DriveUploadChunkInput(
+                started.uploadId, 0, java.util.Base64.getEncoder().encodeToString(first)
+            ))
+            assertEquals(262144, progress.uploadedBytes)
+            assertTrue(!progress.complete)
+
+            val complete = adapter.uploadChunk(com.example.mcp.mcp.DriveUploadChunkInput(
+                started.uploadId, progress.uploadedBytes, java.util.Base64.getEncoder().encodeToString(second)
+            ))
+            assertTrue(complete.complete)
+            assertEquals("resumable-file", complete.file?.id)
+            assertEquals(listOf("bytes 0-262143/262149", "bytes 262144-262148/262149"), ranges)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `metadata request times out when provider does not respond`() {
+        val server = HttpServer.create(InetSocketAddress(0), 0)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val entered = java.util.concurrent.CountDownLatch(1)
+        server.createContext("/files") { exchange ->
+            entered.countDown()
+            release.await(3, java.util.concurrent.TimeUnit.SECONDS)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val adapter = ApiGoogleDriveAdapter(DriveProperties(
+                enabled = true, baseUrl = "http://localhost:${server.address.port}",
+                accessToken = "test", readTimeoutMs = 100
+            ), ObjectMapper())
+            assertThrows(org.springframework.web.client.ResourceAccessException::class.java) {
+                adapter.getFileMetadata(DriveGetFileMetadataInput("file"))
+            }
+            assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS))
+        } finally {
+            release.countDown()
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun `create folder prefers request token over configured token`() {
         val lastAuthHeader = AtomicReference<String>()
         val server = HttpServer.create(InetSocketAddress(0), 0)
@@ -72,8 +222,10 @@ class ApiGoogleDriveAdapterTest {
     fun `upload file sends multipart body and returns normalized file`() {
         val requestBody = AtomicReference<String>()
         val requestAuth = AtomicReference<String>()
+        val requestContentType = AtomicReference<String>()
         val server = HttpServer.create(InetSocketAddress(0), 0)
         server.createContext("/upload/files") { exchange ->
+            requestContentType.set(exchange.requestHeaders.getFirst("Content-Type"))
             requestAuth.set(exchange.requestHeaders.getFirst("Authorization"))
             requestBody.set(exchange.requestBody.readAllBytes().toString(StandardCharsets.UTF_8))
             respondJson(
@@ -114,6 +266,8 @@ class ApiGoogleDriveAdapterTest {
             )
 
             assertEquals("configured-token", requestAuth.get()?.removePrefix("Bearer "))
+            assertTrue(requestContentType.get().startsWith("multipart/related;"))
+            assertTrue(requestContentType.get().contains("boundary="))
             assertTrue(requestBody.get().contains("name=\"metadata\""))
             assertTrue(requestBody.get().contains("name=\"media\""))
             assertTrue(requestBody.get().contains("\"name\":\"reel.mp4\""))

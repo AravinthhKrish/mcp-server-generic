@@ -37,6 +37,8 @@ repositories {
 }
 
 dependencies {
+    implementation("io.modelcontextprotocol.sdk:mcp-spring-webflux:0.18.3")
+    implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:0.18.3")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
@@ -65,4 +67,32 @@ tasks.jacocoTestReport {
         html.required.set(true)
         csv.required.set(false)
     }
+}
+
+tasks.jacocoTestCoverageVerification {
+    dependsOn(tasks.test)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.60".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.25".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.register("evaluate") {
+    group = "verification"
+    description = "Runs regression tests, coverage gates, and generates evaluation reports."
+    dependsOn(tasks.check, tasks.jacocoTestReport)
 }

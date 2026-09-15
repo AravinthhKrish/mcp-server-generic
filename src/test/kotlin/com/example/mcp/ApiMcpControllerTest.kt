@@ -51,6 +51,15 @@ class ApiMcpControllerTest(
     }
 
     @Test
+    fun `execute rejects blank folder name`() {
+        webTestClient.post().uri("/api/mcp/execute")
+            .header("Authorization", "Bearer dev-token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"toolId":"drive.create_folder","params":{"name":" "}}""")
+            .exchange().expectStatus().isBadRequest
+    }
+
+    @Test
     fun `execute endpoint returns market quote response shape`() {
         webTestClient.post()
             .uri("/api/mcp/execute")
@@ -80,17 +89,24 @@ class ApiMcpControllerTest(
             .jsonPath("$.success").isEqualTo(true)
             .jsonPath("$.toolId").isEqualTo("drive.upload_file")
             .jsonPath("$.toolName").isEqualTo("Drive Upload File")
-            .jsonPath("$.result.file.id").isEqualTo("file_upload_001")
+            .jsonPath("$.result.file.id").isNotEmpty
             .jsonPath("$.result.file.sizeBytes").isEqualTo(5)
     }
 
     @Test
     fun `execute endpoint supports drive metadata tool`() {
+        val uploaded = webTestClient.post().uri("/mcp/tools/drive.upload_file")
+            .header("Authorization", "Bearer dev-token")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("""{"name":"reel.mp4","mimeType":"video/mp4","contentBase64":"aGVsbG8="}""")
+            .exchange().expectStatus().isOk
+            .expectBody(com.example.mcp.mcp.DriveUploadFileOutput::class.java)
+            .returnResult().responseBody!!
         webTestClient.post()
             .uri("/api/mcp/execute")
             .header("Authorization", "Bearer dev-token")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("""{"toolId":"drive.file_metadata","toolName":"Drive File Metadata","params":{"fileId":"file_upload_001"}}""")
+            .bodyValue(mapOf("toolId" to "drive.file_metadata", "params" to mapOf("fileId" to uploaded.file.id)))
             .exchange()
             .expectStatus().isOk
             .expectBody()

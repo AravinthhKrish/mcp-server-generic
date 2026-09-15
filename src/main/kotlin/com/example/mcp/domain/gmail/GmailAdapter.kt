@@ -2,6 +2,7 @@ package com.example.mcp.domain.gmail
 
 import com.example.mcp.domain.MailMessage
 import com.example.mcp.mcp.GmailSearchMessagesInput
+import com.example.mcp.mcp.GmailGetThreadInput
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -11,6 +12,7 @@ import java.time.Instant
 
 interface GmailAdapter {
     fun searchMessages(input: GmailSearchMessagesInput): Pair<List<MailMessage>, String?>
+    fun getThread(input: GmailGetThreadInput): List<MailMessage>
 }
 
 @Component
@@ -29,6 +31,14 @@ class StubGmailAdapter : GmailAdapter {
         )
         return listOf(sample) to null
     }
+
+    override fun getThread(input: GmailGetThreadInput): List<MailMessage> = listOf(
+        MailMessage(
+            id = "msg_001", threadId = input.threadId, from = "ceo@company.example",
+            to = listOf("you@company.example"), subject = "Board pack draft",
+            snippet = "Please review before tomorrow", labels = listOf("INBOX"), internalDate = Instant.now()
+        )
+    )
 }
 
 @Component
@@ -72,6 +82,23 @@ class ApiGmailAdapter(
         return messages to nextPageToken
     }
 
+    override fun getThread(input: GmailGetThreadInput): List<MailMessage> {
+        require(properties.accessToken.isNotBlank()) {
+            "integrations.gmail.access-token must be configured when integrations.gmail.enabled=true"
+        }
+        val body = client.get().uri { builder ->
+            builder.path("/users/{userId}/threads/{threadId}")
+                .queryParam("format", "metadata")
+                .queryParam("metadataHeaders", "From")
+                .queryParam("metadataHeaders", "To")
+                .queryParam("metadataHeaders", "Subject")
+                .build(properties.userId, input.threadId)
+        }.header("Authorization", "Bearer ${properties.accessToken}")
+            .retrieve().body(String::class.java) ?: "{}"
+        return objectMapper.readTree(body).path("messages")
+            .takeIf(JsonNode::isArray)?.map(::toMessage) ?: emptyList()
+    }
+
     private fun getMessage(messageId: String): MailMessage {
         val messageBody = client.get()
             .uri { uriBuilder ->
@@ -88,14 +115,17 @@ class ApiGmailAdapter(
             .body(String::class.java)
             ?: "{}"
 
-        val node = objectMapper.readTree(messageBody)
+        return toMessage(objectMapper.readTree(messageBody), messageId)
+    }
+
+    private fun toMessage(node: JsonNode, fallbackId: String = ""): MailMessage {
         val payload = node.path("payload")
         val headers = payload.path("headers")
 
         val internalDate = node.path("internalDate").asText("0").toLongOrNull() ?: 0L
 
         return MailMessage(
-            id = node.path("id").asText(messageId),
+            id = node.path("id").asText(fallbackId),
             threadId = node.path("threadId").asText(""),
             from = headerValue(headers, "From") ?: "",
             to = headerValue(headers, "To")?.split(',')?.map(String::trim)?.filter(String::isNotBlank) ?: emptyList(),

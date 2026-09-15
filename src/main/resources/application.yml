@@ -5,11 +5,25 @@ server:
   port: 8080
 
 integrations:
+  google-oauth:
+    enabled: false
+    client-id: ""
+    client-secret: ""
+    authorization-url: https://accounts.google.com/o/oauth2/v2/auth
+    token-url: https://oauth2.googleapis.com/token
+    redirect-uri: http://localhost:8080/oauth/google/callback
+    scopes:
+      - https://www.googleapis.com/auth/drive.file
   drive:
     enabled: false
     base-url: https://www.googleapis.com/drive/v3
     upload-base-url: https://www.googleapis.com/upload/drive/v3
     access-token: ""
+    connect-timeout-ms: 8000
+    read-timeout-ms: 60000
+    max-chunk-bytes: 8388608
+    max-retries: 2
+    retry-backoff-ms: 200
   gmail:
     enabled: false
     base-url: https://gmail.googleapis.com/gmail/v1
@@ -89,4 +103,22 @@ integrations:
 mcp:
   api:
     auth:
-      token: dev-token
+      token: ${MCP_API_TOKEN:dev-token}
+
+storage:
+  tokens:
+    enabled: false
+    path: ./data/oauth-token-references.json
+  cache:
+    enabled: false
+    path: ./data/cache.json
+  secrets:
+    enabled: false
+    path: ./data/oauth-secrets.json
+    encryption-key-base64: ""
+  jobs:
+    enabled: false
+    path: ./data/reel-upload-jobs.json
+  upload-sessions:
+    enabled: false
+    path: ./data/drive-upload-sessions.json
