@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: mcp-server-generic
-          image: mcp-server-generic:latest
+          image: 192.168.0.104:6000/mcp-generic-tenant:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
