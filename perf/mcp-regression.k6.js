@@ -23,13 +23,32 @@ const authedJsonHeaders = {
   },
 };
 const authedHeaders = { headers: { Authorization: `Bearer ${apiToken}` } };
+const mcpHeaders = {
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+    Authorization: `Bearer ${apiToken}`,
+    'Mcp-Protocol-Version': '2025-06-18',
+  },
+};
 
-function post(path, payload, headers = jsonHeaders) {
+function post(path, payload, headers = authedJsonHeaders) {
   return http.post(`${baseUrl}${path}`, JSON.stringify(payload), headers);
 }
 
-function get(path, headers) {
+function get(path, headers = authedHeaders) {
   return http.get(`${baseUrl}${path}`, headers);
+}
+
+function rpcJson(response) {
+  const body = String(response.body || '').trim();
+  if (body.startsWith('{')) return JSON.parse(body);
+  const data = body.split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trim())
+    .filter(Boolean)
+    .join('\n');
+  return data ? JSON.parse(data) : {};
 }
 
 function esc(value) {
@@ -181,7 +200,7 @@ export function handleSummary(data) {
 
 export default function () {
   group('api/mcp auth checks', () => {
-    const unauthorizedToolsRes = get('/api/mcp/tools');
+    const unauthorizedToolsRes = get('/api/mcp/tools', {});
     check(unauthorizedToolsRes, {
       'api/mcp/tools without auth is 401': (r) => r.status === 401,
     });
@@ -192,6 +211,8 @@ export default function () {
       'api/mcp/tools returns an array': (r) => Array.isArray(r.json()),
       'api/mcp/tools includes market.quote': (r) =>
         Array.isArray(r.json()) && r.json().some((tool) => tool.id === 'market.quote'),
+      'api/mcp/tools includes reel pipeline': (r) =>
+        Array.isArray(r.json()) && r.json().some((tool) => tool.id === 'drive.start_reel_upload'),
     });
   });
 
@@ -216,12 +237,35 @@ export default function () {
       'api/mcp/execute response success true': (r) => r.json('success') === true,
       'api/mcp/execute response toolId matches': (r) => r.json('toolId') === 'market.quote',
       'api/mcp/execute response toolName matches': (r) => r.json('toolName') === 'Market Quote',
-      'api/mcp/execute response result is string': (r) => typeof r.json('result') === 'string',
+      'api/mcp/execute response result is object': (r) => typeof r.json('result') === 'object',
       'api/mcp/execute response simulated true': (r) => r.json('simulated') === true,
     });
   });
 
-  group('legacy mcp endpoints still healthy', () => {
+  group('standard MCP streamable HTTP lifecycle', () => {
+    const initialized = post('/mcp', {
+      jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'k6', version: '1.0' } },
+    }, mcpHeaders);
+    const sessionId = initialized.headers['Mcp-Session-Id'];
+    check(initialized, {
+      'MCP initialize is 200': (r) => r.status === 200,
+      'MCP initialize returns server info': (r) => Boolean(rpcJson(r).result?.serverInfo?.name),
+      'MCP initialize returns session': () => Boolean(sessionId),
+    });
+    if (sessionId) {
+      const sessionHeaders = { headers: { ...mcpHeaders.headers, 'Mcp-Session-Id': sessionId } };
+      post('/mcp', { jsonrpc: '2.0', method: 'notifications/initialized' }, sessionHeaders);
+      const listed = post('/mcp', { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, sessionHeaders);
+      check(listed, {
+        'MCP tools/list is 200': (r) => r.status === 200,
+        'MCP tools/list exposes upload pipeline': (r) =>
+          (rpcJson(r).result?.tools || []).some((tool) => tool.name === 'drive.start_reel_upload'),
+      });
+    }
+  });
+
+  group('REST resource endpoints', () => {
     const newsSourcesRes = get('/mcp/resources/news/sources');
 
     check(newsSourcesRes, {

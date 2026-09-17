@@ -1,0 +1,30 @@
+name: Evaluate MCP
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Run regression tests and coverage
+        run: bash gradlew evaluate --no-daemon
+      - name: Retain evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-evaluation
+          path: |
+            build/reports/tests/
+            build/reports/jacoco/
+            build/test-results/

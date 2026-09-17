@@ -15,7 +15,8 @@ class ApiMcpAuthFilter(
 ) : WebFilter {
     override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> {
         val path = exchange.request.path.value()
-        if (!path.startsWith("/api/mcp")) {
+        if (!(path == "/api/mcp" || path.startsWith("/api/mcp/") ||
+                path == "/mcp" || path.startsWith("/mcp/"))) {
             return chain.filter(exchange)
         }
 
@@ -23,7 +24,7 @@ class ApiMcpAuthFilter(
         val bearerPrefix = "Bearer "
         val token = if (authHeader.startsWith(bearerPrefix)) authHeader.removePrefix(bearerPrefix) else ""
 
-        if (token != authProperties.token) {
+        if (authProperties.token.isBlank() || token != authProperties.token) {
             exchange.response.statusCode = HttpStatus.UNAUTHORIZED
             return exchange.response.setComplete()
         }

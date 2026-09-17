@@ -8,7 +8,9 @@ data class DriveFile(
     val mimeType: String,
     val owners: List<String>,
     val modifiedTime: Instant,
-    val webViewLink: String?
+    val webViewLink: String?,
+    val parents: List<String> = emptyList(),
+    val sizeBytes: Long? = null
 )
 
 data class MailMessage(
